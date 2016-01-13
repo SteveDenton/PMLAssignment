@@ -1,0 +1,108 @@
+---
+title: "Practical Machine Learning Project"
+author: "Steve Denton"
+date: "January 13, 2016"
+output: html_document
+---
+
+##Synopsis
+The goal of this project is to identify the execution type of an exercise, the Unilateral Dumbbell Biceps Curl. The dataset comes from http://groupware.les.inf.puc-rio.br/har, where 6 subjects performed the exercise in the following ways: 
+
+A: Exactly according to the specification.  
+B: Lifting the dumbbell only halfway.  
+C: Throwing the elbows to the front.  
+D: Lowering the dumbbell only halfway.  
+E: Throwing the hips to the front.  
+
+Using data gathered from accelerometers on the belt, forearm, arm, and dumbell of the participants, we will use a machine learning algorithm to predict the activity (A through E above).
+
+##Data Processing
+First let's set up the environment:
+```{r message=FALSE, warning=FALSE}
+library(knitr)
+library(caret)
+library(randomForest)
+library(parallel)
+library(doParallel)
+
+set.seed(996)
+```
+Then load the Data:
+```{r cache=TRUE}
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+data <- read.csv(url(trainUrl), na.strings=c("NA", "#DIV/0!", ""))
+test <- read.csv(url(testUrl),  na.strings=c("NA", "#DIV/0!", ""))
+```
+The dataset 'data' contains over 19K rows of sample data, with the outcome (variable 'classe') populated. The dataset 'test' contains 20 rows, which we will have to try to classify (their 'classe' variable is empty).
+
+Now let's clean it. We will perform the following:
+
+- Make the 'classe' outcome variable a factor.
+
+- Remove unwanted columns (the first 7 contain non-accelerometer data).
+
+- A lot of columns contain mostly NA values, so we will remove any columns that has more than 1000 NA's.  
+
+The 'test' dataset will have the same columns removed, so that it will match the 'data' dataset:
+```{r}
+dim(data)
+## Make the outcome a factor:
+data$classe <- as.factor(data$classe)  
+
+## We don't need the first seven columns (non-sensor data)
+data <- subset(data, select = -c(1:7))
+test <- subset(test, select = -c(1:7))
+
+## A lot of the columns have mostly NA data, with 19k+ rows, lets eliminate any that
+## have more than 1000 NA's in them
+keepCols <- which(colSums(is.na(data))<1000)
+data <- data[, keepCols]
+test <- test[, keepCols]
+
+dim(data)
+```
+We have gone from 160 columns to 53 columns (52 variables and an outcome) to build our model from.
+
+Divide the data into training/test sets (60%/40% split) for cross validation:
+```{r}
+inTrain    <- createDataPartition(data$classe, p = 0.6, list = FALSE)
+data.train <- data[ inTrain, ]
+data.test  <- data[-inTrain, ]
+```
+##Model Fitting
+After experimenting with several different models (and lots of waiting on Models to finish), Random Forest seemed to give the best results on this dataset. So using Random Forests, first we will train it on 'data.train'. Note this is very slow, so we will use multiple proccessor cores to speed things up:
+```{r cache=TRUE}
+## Set Up Parallel Processing, leave one core unused so we can do other stuff
+c <- makeCluster(detectCores() - 1)
+registerDoParallel(c)
+
+tc <- trainControl(allowParallel=TRUE)
+
+## Fit the Model using Random Forest
+model = train(classe~., method="rf", data=data.train)
+
+stopCluster(c)
+
+model
+```
+With mtry = 27, accuracy is almost 99%.
+
+##Cross Validation
+
+Now let's see how the model does against the test data:
+```{r}
+p = predict(model, newdata=data.test)
+confusionMatrix(p,data.test$classe)
+```
+So we have a ~99% accuracy on predicting our test data partition.
+
+##Results
+Now we can apply the model to the other file we downloaded (the data with 'classe' empty), and try to predict the outcome ('classe' variable):
+```{r}
+p = predict(model, newdata=test)
+p
+```
+
+These were entered into the post assignment quiz, and graded as '100%' correct.

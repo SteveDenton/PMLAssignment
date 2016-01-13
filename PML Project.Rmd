@@ -87,7 +87,7 @@ stopCluster(c)
 
 model
 ```
-With mtry = 27, accuracy is almost 99%.
+With mtry = 27, accuracy is 98.7%.
 
 ##Cross Validation
 
@@ -96,7 +96,7 @@ Now let's see how the model does against the test data:
 p = predict(model, newdata=data.test)
 confusionMatrix(p,data.test$classe)
 ```
-So we have a ~99% accuracy on predicting our test data partition.
+So we have a 99.15% accuracy on predicting our test data partition (0.85% Out Of Sample Error).
 
 ##Results
 Now we can apply the model to the other file we downloaded (the data with 'classe' empty), and try to predict the outcome ('classe' variable):
